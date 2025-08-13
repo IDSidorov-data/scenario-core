@@ -16,6 +16,7 @@ from core.financials import (
     calculate_unit_economics,
 )
 
+
 # ---------------------------
 # Robust Localization loader
 # ---------------------------
@@ -55,11 +56,15 @@ def load_translation(lang: str = "ru") -> Dict[str, Any]:
         except Exception as e:
             st.warning(f"Failed to load translation from {p}: {e}")
 
-    st.warning(f"Translation file not found. Searched: {', '.join(str(x) for x in candidates)}")
+    st.warning(
+        f"Translation file not found. Searched: {', '.join(str(x) for x in candidates)}"
+    )
     return {}
+
 
 # load translations (default ru)
 T = load_translation("ru")
+
 
 def _(key: str, default: str = "") -> str:
     """Safe lookup for nested keys like 'table_headers.revenue'. Returns default or key when not found."""
@@ -71,6 +76,7 @@ def _(key: str, default: str = "") -> str:
         else:
             return default or key
     return cur if isinstance(cur, str) else str(cur)
+
 
 # ---------------------------
 # Helpers
@@ -90,10 +96,13 @@ def format_rub(value: Any, decimals: int = 0) -> str:
     except Exception:
         return f"₽{value}"
 
+
 # ---------------------------
 # Page config
 # ---------------------------
-st.set_page_config(page_title=_("app_title", "Scenario — Финансовый симулятор"), layout="wide")
+st.set_page_config(
+    page_title=_("app_title", "Scenario — Финансовый симулятор"), layout="wide"
+)
 st.title(_("app_title", "Scenario — Финансовый симулятор"))
 
 # ---------------------------
@@ -102,18 +111,77 @@ st.title(_("app_title", "Scenario — Финансовый симулятор"))
 with st.sidebar:
     st.header(_("inputs_header", "Входные параметры"))
 
-    mrr = st.number_input(_("mrr_label", "MRR (₽ / месяц)"), min_value=0.0, value=5000.0, step=100.0, format="%.2f")
-    monthly_growth_pct = st.number_input(_("monthly_growth_label", "Рост в месяц (%)"), min_value=0.0, max_value=1000000.0, value=5.0, step=0.1, format="%.3f")
-    churn_pct = st.number_input(_("churn_label", "Отток (%)"), min_value=0.0, max_value=100.0, value=2.0, step=0.1, format="%.3f")
-    arpu = st.number_input(_("arpu_label", "ARPU (₽ / пользователь / месяц)"), min_value=0.0, value=50.0, step=1.0, format="%.2f")
-    cac = st.number_input(_("cac_label", "CAC (₽)"), min_value=0.0, value=200.0, step=10.0, format="%.2f")
-    fixed_costs = st.number_input(_("fixed_costs_label", "Фиксированные расходы (₽ / месяц)"), min_value=0.0, value=3000.0, step=100.0, format="%.2f")
-    variable_costs_pct = st.number_input(_("variable_costs_label", "Переменные расходы (%)"), min_value=0.0, max_value=100.0, value=20.0, step=0.1, format="%.3f")
-    payment_lag_days = st.number_input(_("payment_lag_label", "Задержка платежа (дней)"), min_value=0, max_value=365, value=30, step=1)
-    horizon_months = st.number_input(_("horizon_label", "Горизонт прогноза (месяцев)"), min_value=1, max_value=120, value=12, step=1)
+    mrr = st.number_input(
+        _("mrr_label", "MRR (₽ / месяц)"),
+        min_value=0.0,
+        value=5000.0,
+        step=100.0,
+        format="%.2f",
+    )
+    monthly_growth_pct = st.number_input(
+        _("monthly_growth_label", "Рост в месяц (%)"),
+        min_value=0.0,
+        max_value=1000000.0,
+        value=5.0,
+        step=0.1,
+        format="%.3f",
+    )
+    churn_pct = st.number_input(
+        _("churn_label", "Отток (%)"),
+        min_value=0.0,
+        max_value=100.0,
+        value=2.0,
+        step=0.1,
+        format="%.3f",
+    )
+    arpu = st.number_input(
+        _("arpu_label", "ARPU (₽ / пользователь / месяц)"),
+        min_value=0.0,
+        value=50.0,
+        step=1.0,
+        format="%.2f",
+    )
+    cac = st.number_input(
+        _("cac_label", "CAC (₽)"), min_value=0.0, value=200.0, step=10.0, format="%.2f"
+    )
+    fixed_costs = st.number_input(
+        _("fixed_costs_label", "Фиксированные расходы (₽ / месяц)"),
+        min_value=0.0,
+        value=3000.0,
+        step=100.0,
+        format="%.2f",
+    )
+    variable_costs_pct = st.number_input(
+        _("variable_costs_label", "Переменные расходы (%)"),
+        min_value=0.0,
+        max_value=100.0,
+        value=20.0,
+        step=0.1,
+        format="%.3f",
+    )
+    payment_lag_days = st.number_input(
+        _("payment_lag_label", "Задержка платежа (дней)"),
+        min_value=0,
+        max_value=365,
+        value=30,
+        step=1,
+    )
+    horizon_months = st.number_input(
+        _("horizon_label", "Горизонт прогноза (месяцев)"),
+        min_value=1,
+        max_value=120,
+        value=12,
+        step=1,
+    )
 
     st.markdown("---")
-    allow_send_ai = st.checkbox(_("ui.ai_consent_checkbox_label", "Разрешаю отправку данных в AI (PII не отправляется по умолчанию)"), value=False)
+    allow_send_ai = st.checkbox(
+        _(
+            "ui.ai_consent_checkbox_label",
+            "Разрешаю отправку данных в AI (PII не отправляется по умолчанию)",
+        ),
+        value=False,
+    )
 
 # ---------------------------
 # Inputs dict
@@ -148,8 +216,17 @@ INPUTS_SCHEMA = {
         "payment_lag_days": {"type": "integer", "minimum": 0, "maximum": 365},
         "horizon_months": {"type": "integer", "minimum": 1, "maximum": 120},
     },
-    "required": ["mrr", "monthly_growth_pct", "churn_pct", "arpu", "cac", "fixed_costs", "variable_costs_pct"],
+    "required": [
+        "mrr",
+        "monthly_growth_pct",
+        "churn_pct",
+        "arpu",
+        "cac",
+        "fixed_costs",
+        "variable_costs_pct",
+    ],
 }
+
 
 # ---------------------------
 # Cached calculations
@@ -169,10 +246,13 @@ def run_calculations(inp: Dict[str, Any]) -> Dict[str, Any]:
             "ltv": None,
             "ltv_cac": None,
             "break_even_month": None,
-            "warnings": [_("warnings.churn_zero", "Отток = 0% — значение нестабильно для LTV")],
+            "warnings": [
+                _("warnings.churn_zero", "Отток = 0% — значение нестабильно для LTV")
+            ],
         }
 
     return {"pnl": pnl_df, "cashflow": cf_df, "unit_metrics": unit_metrics}
+
 
 # ---------------------------
 # Run + UI
@@ -207,17 +287,36 @@ if calc_result:
         ltv_cac = metrics.get("ltv_cac")
         bem = metrics.get("break_even_month")
 
-        st.metric(_("ltv_label", "LTV"), format_rub(ltv, decimals=0) if ltv is not None else "—")
-        st.metric(_("ltv_cac_label", "LTV / CAC"), f"{ltv_cac:.2f}" if (ltv_cac is not None) else "—")
-        st.metric(_("bem_metric_label", "Месяц выхода на окупаемость"), str(bem) if bem is not None else "—")
+        st.metric(
+            _("ltv_label", "LTV"),
+            format_rub(ltv, decimals=0) if ltv is not None else "—",
+        )
+        st.metric(
+            _("ltv_cac_label", "LTV / CAC"),
+            f"{ltv_cac:.2f}" if (ltv_cac is not None) else "—",
+        )
+        st.metric(
+            _("bem_metric_label", "Месяц выхода на окупаемость"),
+            str(bem) if bem is not None else "—",
+        )
 
         st.markdown("---")
         if st.button(_("ui.get_ai", "Получить рекомендацию (AI)")):
             if not allow_send_ai:
-                st.info(_("ui.ai_consent_required", "Отметьте чекбокс 'Разрешаю отправку данных в AI' в сайдбаре, чтобы использовать AI."))
+                st.info(
+                    _(
+                        "ui.ai_consent_required",
+                        "Отметьте чекбокс 'Разрешаю отправку данных в AI' в сайдбаре, чтобы использовать AI.",
+                    )
+                )
             else:
                 with st.spinner(_("ui.ai_spinner", "Запрошено у AI...")):
-                    st.success(_("ui.ai_stub_response", "AI: Сократите CAC и улучшите удержание — это повысит LTV/CAC."))
+                    st.success(
+                        _(
+                            "ui.ai_stub_response",
+                            "AI: Сократите CAC и улучшите удержание — это повысит LTV/CAC.",
+                        )
+                    )
 
     with right:
         st.header(_("reports_header", "Отчёты"))
@@ -237,27 +336,33 @@ if calc_result:
         # localized headers map for dataframe display only
         table_headers_translation = T.get("table_headers", {})
 
-        tabs = st.tabs([
-            _("pnl_tab", "P&L"),
-            _("cashflow_tab", "Денежный поток"),
-            _("charts_tab", "Графики"),
-            _("export_tab", "Экспорт"),
-            _("how_calc_tab", "Как считается"),
-        ])
+        tabs = st.tabs(
+            [
+                _("pnl_tab", "P&L"),
+                _("cashflow_tab", "Денежный поток"),
+                _("charts_tab", "Графики"),
+                _("export_tab", "Экспорт"),
+                _("how_calc_tab", "Как считается"),
+            ]
+        )
 
         with tabs[0]:
             st.subheader(_("pnl_subheader", "Отчёт о прибылях и убытках"))
-            pnl_df_display = pnl_df.rename(columns=table_headers_translation).rename_axis(_("table_index_month", "Месяц"))
+            pnl_df_display = pnl_df.rename(
+                columns=table_headers_translation
+            ).rename_axis(_("table_index_month", "Месяц"))
             st.dataframe(pnl_df_display, use_container_width=True)
 
         with tabs[1]:
             st.subheader(_("cashflow_subheader", "Отчёт о движении денежных средств"))
-            cf_df_display = cf_df.rename(columns=table_headers_translation).rename_axis(_("table_index_month", "Месяц"))
+            cf_df_display = cf_df.rename(columns=table_headers_translation).rename_axis(
+                _("table_index_month", "Месяц")
+            )
             st.dataframe(cf_df_display, use_container_width=True)
 
         with tabs[2]:
             st.subheader(_("charts_tab", "Графики"))
-            
+
             headers = T.get("table_headers", {})
             index_name = _("table_index_month", "Месяц")
 
@@ -267,7 +372,7 @@ if calc_result:
                 revenue_chart_data = (
                     pnl_df[["revenue"]]
                     .rename(columns=headers)
-                    .rename_axis(index_name) # <--- ДОБАВЛЕНО ЗДЕСЬ
+                    .rename_axis(index_name)  # <--- ДОБАВЛЕНО ЗДЕСЬ
                 )
                 st.line_chart(revenue_chart_data, height=250)
 
@@ -277,7 +382,7 @@ if calc_result:
                 gross_profit_chart_data = (
                     pnl_df[["gross_profit"]]
                     .rename(columns=headers)
-                    .rename_axis(index_name) # <--- И ЗДЕСЬ
+                    .rename_axis(index_name)  # <--- И ЗДЕСЬ
                 )
                 st.line_chart(gross_profit_chart_data, height=200)
 
@@ -287,17 +392,37 @@ if calc_result:
                 cashflow_chart_data = (
                     cf_df[["receipts", "payments"]]
                     .rename(columns=headers)
-                    .rename_axis(index_name) # <--- И ЗДЕСЬ
+                    .rename_axis(index_name)  # <--- И ЗДЕСЬ
                 )
                 st.line_chart(cashflow_chart_data, height=250)
 
         with tabs[3]:
             st.subheader(_("export_tab", "Экспорт"))
-            st.download_button(_("ui.download_pnl", "Скачать P&L CSV"), pnl_df.to_csv(index=False).encode("utf-8"), "pnl.csv", "text/csv")
-            st.download_button(_("ui.download_cf", "Скачать CashFlow CSV"), cf_df.to_csv(index=False).encode("utf-8"), "cashflow.csv", "text/csv")
-            st.download_button(_("ui.download_inputs", "Скачать inputs JSON"), json.dumps(inputs, indent=2, ensure_ascii=False).encode("utf-8"), "inputs.json", "application/json")
+            st.download_button(
+                _("ui.download_pnl", "Скачать P&L CSV"),
+                pnl_df.to_csv(index=False).encode("utf-8"),
+                "pnl.csv",
+                "text/csv",
+            )
+            st.download_button(
+                _("ui.download_cf", "Скачать CashFlow CSV"),
+                cf_df.to_csv(index=False).encode("utf-8"),
+                "cashflow.csv",
+                "text/csv",
+            )
+            st.download_button(
+                _("ui.download_inputs", "Скачать inputs JSON"),
+                json.dumps(inputs, indent=2, ensure_ascii=False).encode("utf-8"),
+                "inputs.json",
+                "application/json",
+            )
 
         with tabs[4]:
             st.subheader(_("how_calc_tab", "Как считается"))
             st.latex(r"\mathrm{LTV} = \frac{ARPU}{Churn\_rate / 100}")
-            st.write(_("formulas_description", "- Revenue моделируется как MRR * (1 + monthly_growth)^(t-1)."))
+            st.write(
+                _(
+                    "formulas_description",
+                    "- Revenue моделируется как MRR * (1 + monthly_growth)^(t-1).",
+                )
+            )

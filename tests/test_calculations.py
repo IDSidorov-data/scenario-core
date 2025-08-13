@@ -16,6 +16,7 @@ from core.financials import (
 # Fixture: базовые корректные входные данные
 # --------------------
 
+
 @pytest.fixture
 def base_inputs():
     """
@@ -44,7 +45,9 @@ def test_unit_economics_structure_and_types(base_inputs):
     inputs = deepcopy(base_inputs)
     metrics = calculate_unit_economics(inputs)
     assert isinstance(metrics, dict)
-    assert set(["ltv", "ltv_cac", "break_even_month", "warnings"]).issubset(metrics.keys())
+    assert set(["ltv", "ltv_cac", "break_even_month", "warnings"]).issubset(
+        metrics.keys()
+    )
     assert isinstance(metrics["warnings"], list)
 
 
@@ -80,7 +83,9 @@ def test_zero_cac_returns_none_and_warning(base_inputs):
     assert metrics["ltv_cac"] is None
     assert isinstance(metrics["warnings"], list)
     # допускаем гибкий текст предупреждения — проверяем наличие упоминания CAC или LTV/CAC
-    assert any(("cac" in w.lower()) or ("ltv/cac" in w.lower()) for w in metrics["warnings"]) 
+    assert any(
+        ("cac" in w.lower()) or ("ltv/cac" in w.lower()) for w in metrics["warnings"]
+    )
 
 
 # --------------------
@@ -93,7 +98,14 @@ def test_pnl_structure_and_types(base_inputs):
     pnl = calculate_pnl(inputs)
     assert isinstance(pnl, pd.DataFrame)
     assert pnl.index.name == "month"
-    expected_columns = {'revenue', 'cogs', 'gross_profit', 'fixed_costs', 'operating_profit', 'net_profit'}
+    expected_columns = {
+        "revenue",
+        "cogs",
+        "gross_profit",
+        "fixed_costs",
+        "operating_profit",
+        "net_profit",
+    }
     assert expected_columns.issubset(set(pnl.columns))
 
 
@@ -101,7 +113,7 @@ def test_pnl_first_month_revenue(base_inputs):
     inputs = deepcopy(base_inputs)
     pnl = calculate_pnl(inputs)
     # Ожидаем, что выручка в 1-й месяц равна стартовому MRR
-    assert pnl.loc[1, "revenue"] == pytest.approx(base_inputs["mrr"]) 
+    assert pnl.loc[1, "revenue"] == pytest.approx(base_inputs["mrr"])
 
 
 # --------------------
@@ -114,7 +126,10 @@ def test_cashflow_structure_and_types(base_inputs):
     cf = calculate_cashflow(inputs)
     assert isinstance(cf, pd.DataFrame)
     assert cf.index.name == "month"
-    assert all(col in cf.columns for col in ["receipts", "payments", "net_cash", "cumulative_cash"]) 
+    assert all(
+        col in cf.columns
+        for col in ["receipts", "payments", "net_cash", "cumulative_cash"]
+    )
 
 
 # --------------------
@@ -158,6 +173,3 @@ def test_extreme_scenario_warns_not_crashes(base_inputs):
     assert isinstance(metrics.get("warnings"), list)
     # хотя точный текст предупреждения может отличаться, ожидаем хотя бы одно предупреждение
     assert len(metrics.get("warnings", [])) >= 0
-
-
-
