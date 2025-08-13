@@ -160,7 +160,7 @@ def calculate_unit_economics(inputs: Dict) -> Dict:
         bem = int(positive_cashflow.idxmax())
 
     if inputs.get("payment_lag_days", 0) > 60:
-        warnings.append("payment_lag_days > 60 — high cashflow risk")
+        warnings.append("HIGH_PAYMENT_LAG")
 
     return {
         "ltv": ltv,
