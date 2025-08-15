@@ -25,19 +25,16 @@
   "table_index_month": "Месяц",
   "ui": {
     "get_ai": "Получить AI-рекомендацию",
-    "ai_consent_required": "Чтобы получить рекомендацию, отметьте галочку ниже.",
+    "ai_consent_required": "Чтобы получить рекомендацию, отметьте галочку.",
     "ai_consent_checkbox_label": "Разрешаю отправку анонимных данных в AI",
     "ai_spinner": "Анализирую сценарий...",
     "ai_stub_response": "AI Рекомендация: Ваш LTV/CAC выглядит здоровым. Сфокусируйтесь на удержании клиентов для дальнейшего роста.",
-    "download_pnl": "Скачать P&L (Excel)",
-    "download_cf": "Скачать денежный поток (Excel)",
-    "download_inputs": "Скачать сценарий (JSON)",
-    "download_scenario_excel": "Скачать сценарий (Excel)",
+    "download_full_report": "Скачать полный отчет (Excel)",
+    "download_scenario_json": "Скачать сценарий (JSON)",
     "calculating_spinner": "Выполняю расчеты...",
     "traceback_expander": "Технические детали ошибки",
-    "pnl_filename": "отчет_о_прибылях_и_убытках.xlsx",
-    "cf_filename": "отчет_о_движении_денежных_средств.xlsx",
-    "inputs_filename": "сценарий.json"
+    "full_report_filename": "финансовый_отчет.xlsx",
+    "scenario_filename": "сценарий.json"
   },
   "table_headers": {
     "revenue": "Выручка", "cogs": "Себестоимость", "gross_profit": "Валовая прибыль",
@@ -61,7 +58,8 @@
   "warnings": {
     "churn_zero": "Отток = 0%. LTV считается бесконечным и не отображается.",
     "high_payment_lag": "Задержка платежа > 60 дней. Высокий риск кассового разрыва.",
-    "cac_zero": "CAC равен 0. Соотношение LTV/CAC не определено."
+    "cac_zero": "CAC равен 0. Соотношение LTV/CAC не определено.",
+    "unit_error": "Не удалось посчитать юнит-экономику. Проверьте входные параметры."
   },
   "errors": {
     "invalid_input": "Ошибка: Некорректные входные данные.", "internal_error": "Произошла внутренняя ошибка."

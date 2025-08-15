@@ -1,8 +1,8 @@
+# core/financials.py (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 from typing import Dict, List, Optional
 import math
 import pandas as pd
 
-# REQUIRED_FIELDS and _validate_inputs assumed same as before
 REQUIRED_FIELDS = {
     "mrr",
     "monthly_growth_pct",
@@ -21,75 +21,52 @@ def _validate_inputs(inputs: Dict) -> None:
     if missing:
         raise ValueError(f"Missing required inputs: {', '.join(sorted(missing))}")
 
-    # basic checks (as in previous version)
-    def num(key):
-        return inputs.get(key)
+    for k in ["mrr", "arpu", "cac", "fixed_costs", "monthly_growth_pct"]:
+        v = inputs.get(k)
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError(f"{k} must be a non-negative number")
 
-    for k in ["mrr", "arpu", "cac", "fixed_costs"]:
-        v = num(k)
-        if not isinstance(v, (int, float)):
-            raise ValueError(f"{k} must be a number")
-        if v < 0:
-            raise ValueError(f"{k} must be >= 0")
+    for k in ["churn_pct", "variable_costs_pct"]:
+        v = inputs.get(k)
+        if not isinstance(v, (int, float)) or not 0 <= v <= 100:
+            raise ValueError(f"{k} must be between 0 and 100")
 
-    for k in ["monthly_growth_pct", "churn_pct", "variable_costs_pct"]:
-        v = num(k)
-        if not isinstance(v, (int, float)):
-            raise ValueError(f"{k} must be a number")
-        if v < 0:
-            raise ValueError(f"{k} must be >= 0")
+    # ИЗМЕНЕНО: Удалена слишком строгая проверка для churn_pct.
+    # Теперь churn_pct = 0 является валидным значением.
+    # if inputs['churn_pct'] <= 0:
+    #     raise ValueError("churn_pct must be > 0 to calculate LTV")
 
-    if inputs["variable_costs_pct"] > 100:
-        raise ValueError("variable_costs_pct must be <= 100")
-    if inputs["churn_pct"] < 0 or inputs["churn_pct"] > 100:
-        raise ValueError("churn_pct must be between 0 and 100")
-    if inputs["monthly_growth_pct"] < 0:
-        raise ValueError("monthly_growth_pct must be >= 0")
+    for key in ["payment_lag_days", "horizon_months"]:
+        val = inputs.get(key)
+        if not isinstance(val, int):
+            if isinstance(val, float) and val.is_integer():
+                inputs[key] = int(val)
+            else:
+                raise ValueError(f"{key} must be an integer")
 
-    lag = inputs.get("payment_lag_days")
-    if not isinstance(lag, int):
-        if isinstance(lag, float) and lag.is_integer():
-            inputs["payment_lag_days"] = int(lag)
-        else:
-            raise ValueError("payment_lag_days must be integer days")
-    if inputs["payment_lag_days"] < 0 or inputs["payment_lag_days"] > 365:
+    if not 0 <= inputs["payment_lag_days"] <= 365:
         raise ValueError("payment_lag_days must be 0..365")
-
-    h = inputs.get("horizon_months")
-    if not isinstance(h, int):
-        if isinstance(h, float) and h.is_integer():
-            inputs["horizon_months"] = int(h)
-        else:
-            raise ValueError("horizon_months must be an integer")
-    if inputs["horizon_months"] < 1 or inputs["horizon_months"] > 120:
+    if not 1 <= inputs["horizon_months"] <= 120:
         raise ValueError("horizon_months must be between 1 and 120")
 
 
 def calculate_pnl(inputs: Dict) -> pd.DataFrame:
-    """
-    Returns P&L DataFrame for months 1..horizon_months.
-    Vectorized implementation.
-    """
     _validate_inputs(inputs)
-
-    mrr = float(inputs["mrr"])
-    growth_rate = float(inputs["monthly_growth_pct"]) / 100.0
-    variable_pct = float(inputs["variable_costs_pct"]) / 100.0
-    fixed = float(inputs["fixed_costs"])
-    horizon = int(inputs["horizon_months"])
-
+    mrr, growth_rate, variable_pct, fixed, horizon = (
+        float(inputs["mrr"]),
+        float(inputs["monthly_growth_pct"]) / 100.0,
+        float(inputs["variable_costs_pct"]) / 100.0,
+        float(inputs["fixed_costs"]),
+        int(inputs["horizon_months"]),
+    )
     months = pd.RangeIndex(start=1, stop=horizon + 1, name="month")
-
-    # Vectorized growth factors as a numpy/pandas array, then explicit Series
     growth_factors = (1 + growth_rate) ** (months - 1)
     revenue_series = pd.Series(mrr * growth_factors, index=months, name="revenue")
-
     cogs = revenue_series * variable_pct
     gross_profit = revenue_series - cogs
     fixed_costs = pd.Series(fixed, index=months, name="fixed_costs")
     operating_profit = gross_profit - fixed_costs
     net_profit = operating_profit.copy()
-
     df = pd.DataFrame(
         {
             "revenue": revenue_series,
@@ -105,23 +82,15 @@ def calculate_pnl(inputs: Dict) -> pd.DataFrame:
 
 
 def calculate_cashflow(inputs: Dict) -> pd.DataFrame:
-    """
-    Returns cashflow DataFrame.
-    Uses pandas.Series.shift for receipts calculation.
-    """
     _validate_inputs(inputs)
     pnl = calculate_pnl(inputs)
     lag_days = int(inputs["payment_lag_days"])
     lag_months = int(math.ceil(lag_days / 30.0)) if lag_days > 0 else 0
-
-    # shift revenue forward by lag_months so revenue at month t is received at month t+lag_months
     receipts = pnl["revenue"].shift(lag_months, fill_value=0.0)
     receipts.name = "receipts"
-
     payments = pnl["cogs"] + pnl["fixed_costs"]
     net_cash = receipts - payments
     cumulative_cash = net_cash.cumsum()
-
     df = pd.DataFrame(
         {
             "receipts": receipts,
@@ -135,29 +104,29 @@ def calculate_cashflow(inputs: Dict) -> pd.DataFrame:
 
 
 def calculate_unit_economics(inputs: Dict) -> Dict:
-    """
-    Returns dict with unit economics: ltv, ltv_cac, break_even_month, warnings
-    """
     _validate_inputs(inputs)
-    arpu = float(inputs["arpu"])
-    churn_pct = float(inputs["churn_pct"])
-    cac = float(inputs["cac"])
+    arpu, churn_pct, cac = (
+        float(inputs["arpu"]),
+        float(inputs["churn_pct"]),
+        float(inputs["cac"]),
+    )
     warnings: List[str] = []
 
-    if churn_pct <= 0:
-        raise ValueError("churn_pct must be > 0 to calculate LTV")
-    ltv = arpu / (churn_pct / 100.0)
+    if churn_pct == 0:
+        ltv = None
+        warnings.append("CHURN_ZERO")
+    else:
+        ltv = arpu / (churn_pct / 100.0)
 
-    ltv_cac = ltv / cac if cac > 0 else None
+    ltv_cac = ltv / cac if cac > 0 and ltv is not None else None
     if cac <= 0:
-        warnings.append("CAC is 0 or negative — LTV/CAC undefined")
+        warnings.append("CAC_ZERO")
 
     cashflow = calculate_cashflow(inputs)
     positive_cashflow = cashflow["cumulative_cash"] >= 0
-
-    bem: Optional[int] = None
-    if positive_cashflow.any():
-        bem = int(positive_cashflow.idxmax())
+    bem: Optional[int] = (
+        int(positive_cashflow.idxmax()) if positive_cashflow.any() else None
+    )
 
     if inputs.get("payment_lag_days", 0) > 60:
         warnings.append("HIGH_PAYMENT_LAG")

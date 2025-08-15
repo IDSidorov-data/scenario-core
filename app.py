@@ -1,4 +1,4 @@
-# app.py (Финальная, эталонная версия v17 - идеальный UX для AI-блока)
+# app.py (Финальная, эталонная версия v22 - Production-Ready)
 import json
 from copy import deepcopy
 from typing import Dict, Any
@@ -6,7 +6,6 @@ from pathlib import Path
 from io import BytesIO
 
 import streamlit as st
-import streamlit.components.v1 as components
 from jsonschema import validate, ValidationError
 import pandas as pd
 import altair as alt
@@ -26,21 +25,9 @@ st.set_page_config(page_title="Scenario — Финансовый симулят�
 st.markdown(
     """
 <style>
-    /* Уменьшаем верхний отступ у главного контейнера */
-    .block-container {
-        padding-top: 1rem !important;
-    }
-    /* "Притягиваем" заголовок в сайдбаре наверх */
-    [data-testid="stSidebar"] h2 {
-        margin-top: -1.7rem;
-        font-size: 24px !important;
-        color: #262730;
-    }
-    /* Добавляем отступ между кнопками скачивания */
-    [data-testid="stDownloadButton"] {
-        margin-bottom: 10px;
-    }
-    /* Стилизация st.radio, чтобы он выглядел как st.tabs */
+    .block-container { padding-top: 1rem !important; }
+    [data-testid="stSidebar"] h2 { margin-top: -1.7rem; font-size: 24px !important; color: #262730; }
+    [data-testid="stDownloadButton"] { margin-bottom: 10px; }
     div[role="radiogroup"] { flex-direction: row; gap: 2px; }
     div[role="radiogroup"] > label > div:first-child { display: none; }
     div[role="radiogroup"] > label {
@@ -58,24 +45,42 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# NEW: Надежная инициализация всех ключей session_state
+for k, v in [
+    ("calc_result", None),
+    ("allow_send_ai", False),
+    ("allow_send_ai_local", False),
+    ("main_tab_selector", "pnl"),
+]:
+    if k not in st.session_state:
+        st.session_state[k] = v
 
-# --- Надежный блок локализации ---
+
+# FIXED: Убран UI-вызов из кэшируемой функции
 @st.cache_data
 def load_translation(lang: str = "ru") -> Dict[str, Any]:
     fname = f"{lang}.json"
+    candidates = []
     try:
         here = Path(__file__).resolve().parent
-        path = here / "core" / "locales" / fname
-        if path.exists():
-            with path.open("r", encoding="utf-8") as f:
-                return json.load(f)
+        candidates.extend([here / "core" / "locales" / fname, here / "locales" / fname])
     except Exception:
         pass
-    st.warning(f"Translation file not found.")
+    cwd = Path.cwd()
+    candidates.extend([cwd / "core" / "locales" / fname, cwd / "locales" / fname])
+    for p in candidates:
+        try:
+            if p.exists():
+                with p.open("r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
     return {}
 
 
 T = load_translation("ru")
+if not T:
+    st.warning("Файл локализации не найден. Будут использоваться стандартные названия.")
 
 
 def _(key: str, default: str = "") -> str:
@@ -100,70 +105,133 @@ def format_rub(value: Any, decimals: int = 0) -> str:
         return f"{value} ₽"
 
 
-def df_to_excel_bytes(df: pd.DataFrame, index_name: str) -> bytes:
+def create_excel_workbook(
+    sheets: Dict[str, pd.DataFrame], index_names: Dict[str, str]
+) -> bytes:
     output = BytesIO()
-    df_display = df.rename_axis(index_name)
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df_display.to_excel(writer, sheet_name="Report", index=True)
-        worksheet = writer.sheets["Report"]
-        header_font = Font(bold=True)
-        thin = Side(border_style="thin", color="000000")
-        border = Border(left=thin, right=thin, top=thin, bottom=thin)
-        for col_idx, value in enumerate(df_display.reset_index().columns.values, 1):
-            cell = worksheet.cell(row=1, column=col_idx)
-            cell.font = header_font
-            cell.alignment = Alignment(horizontal="center")
-            cell.border = border
-        for i, column_cells in enumerate(worksheet.columns, 1):
-            max_length = max(
-                len(str(cell.value)) for cell in column_cells if cell.value is not None
+        for sheet_name, df in sheets.items():
+            idx_name = index_names.get(sheet_name, "Index")
+            df_to_write = df.copy()
+            for col in df_to_write.columns:
+                if pd.api.types.is_numeric_dtype(df_to_write[col]):
+                    df_to_write[col] = df_to_write[col].round(2)
+
+            df_to_write.rename_axis(idx_name).to_excel(
+                writer, sheet_name=sheet_name, index=True
             )
-            adjusted_width = (max_length + 2) * 1.2
-            worksheet.column_dimensions[get_column_letter(i)].width = adjusted_width
-        for row in worksheet.iter_rows(
-            min_row=2,
-            max_row=worksheet.max_row,
-            min_col=1,
-            max_col=worksheet.max_column,
-        ):
-            for cell in row:
+            worksheet = writer.sheets[sheet_name]
+
+            header_font = Font(bold=True)
+            thin = Side(border_style="thin", color="000000")
+            border = Border(left=thin, right=thin, top=thin, bottom=thin)
+            for col_idx, value in enumerate(
+                df_to_write.reset_index().columns.values, 1
+            ):
+                cell = worksheet.cell(row=1, column=col_idx)
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center")
                 cell.border = border
+            for i, column_cells in enumerate(worksheet.columns, 1):
+                lengths = [
+                    len(str(cell.value))
+                    for cell in column_cells
+                    if cell.value is not None
+                ]
+                max_length = max(lengths) if lengths else 0
+                adjusted_width = (max_length + 2) * 1.2
+                worksheet.column_dimensions[get_column_letter(i)].width = adjusted_width
+            for row in worksheet.iter_rows(
+                min_row=2,
+                max_row=worksheet.max_row,
+                min_col=1,
+                max_col=worksheet.max_column,
+            ):
+                for cell in row:
+                    cell.border = border
     return output.getvalue()
 
 
-# --- Инициализация Session State ---
-if "calc_result" not in st.session_state:
-    st.session_state.calc_result = None
+# NEW: Функции для синхронизации чекбоксов
+def _sync_ai_consent_local():
+    st.session_state["allow_send_ai"] = st.session_state.get(
+        "allow_send_ai_local", False
+    )
+
+
+def _sync_ai_consent_main():
+    st.session_state["allow_send_ai_local"] = st.session_state.get(
+        "allow_send_ai", False
+    )
+
 
 # --- Основной UI ---
 st.title(_("app_title", "Scenario — Финансовый симулятор"))
 
 with st.sidebar:
     st.markdown(f"## {_('inputs_header', 'Параметры бизнеса')}")
-    mrr = st.number_input(_("mrr_label", "MRR, ₽"), 0.0, value=5000.0, step=100.0)
+
+    st.checkbox(
+        _("ui.ai_consent_checkbox_label", "Разрешаю отправку данных в AI"),
+        key="allow_send_ai",
+        on_change=_sync_ai_consent_main,
+    )
+    st.markdown("---")
+
+    mrr = st.number_input(
+        _("mrr_label", "MRR, ₽"), min_value=0.0, value=5000.0, step=100.0, format="%.2f"
+    )
     monthly_growth_pct = st.number_input(
-        _("monthly_growth_label", "Рост выручки, %"), 0.0, 1000.0, value=5.0, step=0.1
+        _("monthly_growth_label", "Рост выручки, %"),
+        min_value=0.0,
+        value=5.0,
+        step=0.1,
+        format="%.1f",
+        help="Например, 5 означает 5% роста в месяц",
     )
     churn_pct = st.number_input(
-        _("churn_label", "Отток клиентов, %"), 0.0, 100.0, value=2.0, step=0.1
+        _("churn_label", "Отток клиентов, %"),
+        min_value=0.0,
+        max_value=100.0,
+        value=2.0,
+        step=0.1,
+        format="%.1f",
+        help="Например, 2 означает 2% оттока в месяц",
     )
-    arpu = st.number_input(_("arpu_label", "ARPU, ₽"), 0.0, value=50.0, step=1.0)
-    cac = st.number_input(_("cac_label", "CAC, ₽"), 0.0, value=200.0, step=10.0)
+    arpu = st.number_input(
+        _("arpu_label", "ARPU, ₽"), min_value=0.0, value=50.0, step=1.0, format="%.2f"
+    )
+    cac = st.number_input(
+        _("cac_label", "CAC, ₽"), min_value=0.0, value=200.0, step=10.0, format="%.2f"
+    )
     fixed_costs = st.number_input(
-        _("fixed_costs_label", "Постоянные расходы, ₽"), 0.0, value=3000.0, step=100.0
+        _("fixed_costs_label", "Постоянные расходы, ₽"),
+        min_value=0.0,
+        value=3000.0,
+        step=100.0,
+        format="%.2f",
     )
     variable_costs_pct = st.number_input(
         _("variable_costs_label", "Переменные расходы, %"),
-        0.0,
-        100.0,
+        min_value=0.0,
+        max_value=100.0,
         value=20.0,
         step=0.1,
+        format="%.1f",
     )
     payment_lag_days = st.number_input(
-        _("payment_lag_label", "Задержка платежей, дней"), 0, 365, value=30, step=1
+        _("payment_lag_label", "Задержка платежей, дней"),
+        min_value=0,
+        max_value=365,
+        value=30,
+        step=1,
     )
     horizon_months = st.number_input(
-        _("horizon_label", "Горизонт, мес."), 1, 120, value=12, step=1
+        _("horizon_label", "Горизонт, мес."),
+        min_value=1,
+        max_value=120,
+        value=12,
+        step=1,
     )
 
 inputs = {
@@ -213,7 +281,17 @@ def run_calculations(inp: Dict[str, Any]) -> Dict[str, Any]:
     validate(instance=local, schema=INPUTS_SCHEMA)
     pnl_df = calculate_pnl(local)
     cf_df = calculate_cashflow(local)
-    unit_metrics = calculate_unit_economics(local)
+
+    try:
+        unit_metrics = calculate_unit_economics(local)
+    except Exception:
+        unit_metrics = {
+            "ltv": None,
+            "ltv_cac": None,
+            "break_even_month": None,
+            "warnings": ["UNIT_ERROR"],
+        }
+
     return {"pnl": pnl_df, "cashflow": cf_df, "unit_metrics": unit_metrics}
 
 
@@ -261,18 +339,24 @@ if st.session_state.calc_result:
             ),
         )
 
-        if st.button(_("ui.get_ai", "Получить AI-рекомендацию")):
-            if not st.session_state.get("allow_send_ai", False):
-                st.info(_("ui.ai_consent_required", "Нужно разрешение"))
-            else:
-                with st.spinner(_("ui.ai_spinner", "Анализирую...")):
-                    st.success(_("ui.ai_stub_response", "AI: ..."))
+        st.markdown("---")
 
-        allow_send_ai = st.checkbox(
-            _("ui.ai_consent_checkbox_label", "Разрешаю отправку данных в AI"),
-            value=False,
-            key="allow_send_ai",
-        )
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            st.checkbox(
+                " ",
+                key="allow_send_ai_local",
+                value=st.session_state.get("allow_send_ai", False),
+                on_change=_sync_ai_consent_local,
+                label_visibility="hidden",
+            )
+        with col2:
+            if st.button(_("ui.get_ai", "Получить AI-рекомендацию")):
+                if not st.session_state.get("allow_send_ai", False):
+                    st.info(_("ui.ai_consent_required", "Нужно разрешение"))
+                else:
+                    with st.spinner(_("ui.ai_spinner", "Анализирую...")):
+                        st.success(_("ui.ai_stub_response", "AI: ..."))
 
     with right:
         st.header(_("reports_header", "Финансовые отчёты"))
@@ -370,7 +454,11 @@ if st.session_state.calc_result:
                 .encode(
                     x=alt.X(f"{index_name}:Q", title=index_name),
                     y=alt.Y("Сумма:Q", title="Сумма", axis=alt.Axis(format="~s")),
-                    color=alt.Color("Показатель:N", title="Показатель"),
+                    color=alt.Color(
+                        "Показатель:N",
+                        title="Показатель",
+                        legend=alt.Legend(orient="right", offset=15),
+                    ),
                     tooltip=[
                         index_name,
                         "Показатель",
@@ -378,62 +466,44 @@ if st.session_state.calc_result:
                     ],
                 )
                 .interactive()
-                .properties(padding={"left": 50, "bottom": 10})
+                .properties(width=750, height=420)
             )
             st.altair_chart(chart, use_container_width=True, theme="streamlit")
 
         elif selected_tab_key == "export":
-            pnl_to_export = pnl_df.copy()
-            for col in pnl_to_export.columns:
-                if pd.api.types.is_numeric_dtype(pnl_to_export[col]):
-                    pnl_to_export[col] = pnl_to_export[col].round(2)
-
-            cf_to_export = cf_df.copy()
-            for col in cf_to_export.columns:
-                if pd.api.types.is_numeric_dtype(cf_to_export[col]):
-                    cf_to_export[col] = cf_to_export[col].round(2)
-
-            pnl_excel = df_to_excel_bytes(
-                pnl_to_export.rename(columns=headers), index_name
-            )
-            cf_excel = df_to_excel_bytes(
-                cf_to_export.rename(columns=headers), index_name
-            )
-            inputs_json = json.dumps(inputs, indent=2, ensure_ascii=False).encode(
-                "utf-8"
-            )
-
             param_names = T.get("parameter_names", {})
             translated_inputs = {param_names.get(k, k): v for k, v in inputs.items()}
             inputs_df = pd.DataFrame.from_dict(
                 translated_inputs, orient="index", columns=["Значение"]
             )
-            inputs_excel = df_to_excel_bytes(inputs_df, "Параметр")
+
+            excel_data = create_excel_workbook(
+                sheets={
+                    "Параметры": inputs_df,
+                    "P&L": pnl_df.rename(columns=headers),
+                    "Cash Flow": cf_df.rename(columns=headers),
+                },
+                index_names={
+                    "Параметры": "Параметр",
+                    "P&L": _("table_index_month", "Месяц"),
+                    "Cash Flow": _("table_index_month", "Месяц"),
+                },
+            )
+            inputs_json = json.dumps(inputs, indent=2, ensure_ascii=False).encode(
+                "utf-8"
+            )
 
             st.download_button(
-                _("ui.download_pnl", "Скачать P&L (Excel)"),
-                pnl_excel,
-                _("ui.pnl_filename", "pnl.xlsx"),
+                _("ui.download_full_report", "Скачать полный отчет (Excel)"),
+                excel_data,
+                _("ui.full_report_filename", "финансовый_отчет.xlsx"),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
             st.download_button(
-                _("ui.download_cf", "Скачать денежный поток (Excel)"),
-                cf_excel,
-                _("ui.cf_filename", "cashflow.xlsx"),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-
-            st.download_button(
-                _("ui.download_inputs", "Скачать сценарий (JSON)"),
+                _("ui.download_scenario_json", "Скачать сценарий (JSON)"),
                 inputs_json,
-                _("ui.inputs_filename", "scenario.json"),
+                _("ui.scenario_filename", "сценарий.json"),
                 "application/json",
-            )
-            st.download_button(
-                _("ui.download_scenario_excel", "Скачать сценарий (Excel)"),
-                inputs_excel,
-                "scenario_parameters.xlsx",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
         elif selected_tab_key == "how_calc":
