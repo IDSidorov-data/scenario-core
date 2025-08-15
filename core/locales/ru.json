@@ -1,79 +1,78 @@
 {
   "app_title": "Scenario — Финансовый симулятор",
-  "inputs_header": "Входные параметры",
-  "mrr_label": "MRR (₽ / месяц)",
-  "monthly_growth_label": "Рост в месяц (%)",
-  "churn_label": "Отток (%)",
-  "arpu_label": "ARPU (₽ / пользователь / месяц)",
-  "cac_label": "CAC (₽)",
-  "fixed_costs_label": "Фиксированные расходы (₽ / месяц)",
-  "variable_costs_label": "Переменные расходы (%)",
-  "payment_lag_label": "Задержка платежа (дней)",
+  "inputs_header": "Параметры вашего бизнеса",
+  "mrr_label": "Текущая месячная выручка (MRR), ₽",
+  "monthly_growth_label": "Ежемесячный рост выручки (%)",
+  "churn_label": "Отток клиентов в месяц (%)",
+  "arpu_label": "Средняя выручка с клиента (ARPU), ₽",
+  "cac_label": "Стоимость привлечения клиента (CAC), ₽",
+  "fixed_costs_label": "Постоянные расходы в месяц, ₽",
+  "variable_costs_label": "Переменные расходы (% от выручки)",
+  "payment_lag_label": "Задержка поступления платежей (дней)",
   "horizon_label": "Горизонт прогноза (месяцев)",
-  "reports_header": "Отчёты",
-  "unit_econ_header": "Юнит-экономика",
-  "pnl_tab": "P&L",
-  "cashflow_tab": "Денежный поток",
+  "reports_header": "Финансовые отчёты",
+  "unit_econ_header": "Ключевые метрики (юнит-экономика)",
+  "pnl_tab": "Прибыли и убытки (P&L)",
+  "cashflow_tab": "Денежный поток (Cash Flow)",
   "charts_tab": "Графики",
-  "export_tab": "Экспорт",
-  "how_calc_tab": "Как считается",
+  "export_tab": "Скачать отчет",
+  "how_calc_tab": "Как это считается",
   "pnl_subheader": "Отчёт о прибылях и убытках",
   "cashflow_subheader": "Отчёт о движении денежных средств",
-  "ltv_label": "LTV",
-  "ltv_cac_label": "LTV / CAC",
+  "ltv_label": "Пожизненная ценность клиента (LTV)",
+  "ltv_cac_label": "Соотношение LTV / CAC",
   "bem_metric_label": "Месяц выхода на окупаемость",
   "table_index_month": "Месяц",
   "ui": {
-    "get_ai": "Получить рекомендацию (AI)",
-    "ai_consent_required": "Отметьте чекбокс 'Разрешаю отправку данных в AI' в сайдбаре, чтобы использовать AI.",
-    "ai_consent_checkbox_label": "Разрешаю отправку данных в AI (PII не отправляется по умолчанию)",
-    "ai_spinner": "Запрошено у AI...",
-    "ai_stub_response": "AI: Сократите CAC и улучшите удержание — это повысит LTV/CAC.",
-    "download_pnl": "Скачать P&L CSV",
-    "download_cf": "Скачать CashFlow CSV",
-    "download_inputs": "Скачать inputs JSON",
-    "calculating_spinner": "Вычисляем...",
-    "traceback_expander": "Подробности для разработчика",
-    "pnl_filename": "отчет_о_прибылях_и_убытках.csv",
-    "cf_filename": "отчет_о_движении_денежных_средств.csv",
-    "inputs_filename": "входные_параметры.json"
+    "get_ai": "Получить AI-рекомендацию",
+    "ai_consent_required": "Чтобы получить рекомендацию, отметьте галочку ниже.",
+    "ai_consent_checkbox_label": "Разрешаю отправку анонимных данных в AI",
+    "ai_spinner": "Анализирую сценарий...",
+    "ai_stub_response": "AI Рекомендация: Ваш LTV/CAC выглядит здоровым. Сфокусируйтесь на удержании клиентов для дальнейшего роста.",
+    "download_pnl": "Скачать P&L (Excel)",
+    "download_cf": "Скачать денежный поток (Excel)",
+    "download_inputs": "Скачать сценарий (JSON)",
+    "download_scenario_excel": "Скачать сценарий (Excel)",
+    "calculating_spinner": "Выполняю расчеты...",
+    "traceback_expander": "Технические детали ошибки",
+    "pnl_filename": "отчет_о_прибылях_и_убытках.xlsx",
+    "cf_filename": "отчет_о_движении_денежных_средств.xlsx",
+    "inputs_filename": "сценарий.json"
   },
   "table_headers": {
-    "revenue": "Выручка",
-    "cogs": "Себестоимость",
-    "gross_profit": "Валовая прибыль",
-    "fixed_costs": "Фиксированные расходы",
-    "operating_profit": "Операционная прибыль",
-    "net_profit": "Чистая прибыль",
-    "receipts": "Поступления",
-    "payments": "Платежи",
-    "net_cash": "Чистый денежный поток",
-    "cumulative_cash": "Накопленные средства"
+    "revenue": "Выручка", "cogs": "Себестоимость", "gross_profit": "Валовая прибыль",
+    "fixed_costs": "Постоянные расходы", "operating_profit": "Операционная прибыль", "net_profit": "Чистая прибыль",
+    "receipts": "Поступления", "payments": "Платежи", "net_cash": "Чистый денежный поток", "cumulative_cash": "Накопленный денежный поток"
+  },
+  "parameter_names": {
+    "mrr": "MRR, ₽",
+    "monthly_growth_pct": "Рост выручки, %",
+    "churn_pct": "Отток клиентов, %",
+    "arpu": "ARPU, ₽",
+    "cac": "CAC, ₽",
+    "fixed_costs": "Постоянные расходы, ₽",
+    "variable_costs_pct": "Переменные расходы, %",
+    "payment_lag_days": "Задержка платежей, дней",
+    "horizon_months": "Горизонт, мес."
   },
   "charts": {
-    "revenue": "Выручка по месяцам",
-    "gross_profit": "Валовая прибыль",
-    "receipts_payments": "Поступления и платежи"
+    "revenue": "Динамика выручки", "gross_profit": "Динамика валовой прибыли", "receipts_payments": "Движение денежных средств"
   },
   "warnings": {
-    "churn_zero": "Отток = 0% — значение нестабильно для LTV",
-    "high_payment_lag": "Большая задержка платежа — высокий риск кассового разрыва"
+    "churn_zero": "Отток = 0%. LTV считается бесконечным и не отображается.",
+    "high_payment_lag": "Задержка платежа > 60 дней. Высокий риск кассового разрыва.",
+    "cac_zero": "CAC равен 0. Соотношение LTV/CAC не определено."
   },
   "errors": {
-    "invalid_input": "Ошибка: Некорректные входные данные.",
-    "internal_error": "Произошла внутренняя ошибка."
+    "invalid_input": "Ошибка: Некорректные входные данные.", "internal_error": "Произошла внутренняя ошибка."
   },
   "glossary": {
-    "title": "Термины и обозначения",
-    "mrr": "ежемесячный регулярный доход (Monthly Recurring Revenue): ожидаемый месячный доход от подписок/активных клиентов.",
-    "arpu": "средний доход на пользователя (Average Revenue Per User): выручка / активные пользователи.",
-    "cac": "стоимость привлечения клиента (Customer Acquisition Cost): средние маркетинговые/продажные расходы на одного привлечённого клиента.",
-    "ltv": "пожизненная ценность клиента (Lifetime Value): ожидаемая суммарная маржинальная выручка от одного клиента.",
-    "churn": "отток клиентов в % в месяц.",
-    "cogs": "себестоимость продаж (переменные расходы, прямо пропорциональные выручке).",
-    "payment_lag": "задержка между выставлением счета и поступлением денег (дней).",
-    "horizon": "период, на который делается прогноз (в месяцах)."
+    "title": "Что означают эти метрики?",
+    "terms": {
+      "Юнит-экономика": "показывает, зарабатывает ли ваша бизнес-модель на одном клиенте, \"юните\".",
+      "Churn": "отток клиентов; процент пользователей, переставших пользоваться услугами за определенный период.",
+      "LTV / CAC": "главный показатель здоровья юнит-экономики. Если он больше 3, бизнес-модель считается успешной."
+    }
   },
-  "how_calc_text": "LTV = ARPU / (Churn Rate / 100). Revenue = MRR * (1 + monthly_growth)^(t-1). COGS = revenue * variable_costs_pct. Receipts consider payment_lag_days.",
-  "formulas_description": "- Revenue моделируется как MRR * (1 + monthly_growth)^(t-1)."
+  "formulas_description": "- Выручка моделируется с учетом ежемесячного роста."
 }
