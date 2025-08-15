@@ -1,4 +1,4 @@
-pytest
-black
+pytest>=7.0
+black>=23.0
 flake8
 pre-commit
