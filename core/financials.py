@@ -4,9 +4,17 @@ import math
 import pandas as pd
 
 REQUIRED_FIELDS = {
-    "mrr", "monthly_growth_pct", "churn_pct", "arpu", "cac",
-    "fixed_costs", "variable_costs_pct", "payment_lag_days", "horizon_months",
+    "mrr",
+    "monthly_growth_pct",
+    "churn_pct",
+    "arpu",
+    "cac",
+    "fixed_costs",
+    "variable_costs_pct",
+    "payment_lag_days",
+    "horizon_months",
 }
+
 
 def _validate_inputs(inputs: Dict) -> None:
     missing = REQUIRED_FIELDS - set(inputs.keys())
@@ -41,12 +49,15 @@ def _validate_inputs(inputs: Dict) -> None:
     if not 1 <= inputs["horizon_months"] <= 120:
         raise ValueError("horizon_months must be between 1 and 120")
 
+
 def calculate_pnl(inputs: Dict) -> pd.DataFrame:
     _validate_inputs(inputs)
     mrr, growth_rate, variable_pct, fixed, horizon = (
-        float(inputs["mrr"]), float(inputs["monthly_growth_pct"]) / 100.0,
-        float(inputs["variable_costs_pct"]) / 100.0, float(inputs["fixed_costs"]),
-        int(inputs["horizon_months"])
+        float(inputs["mrr"]),
+        float(inputs["monthly_growth_pct"]) / 100.0,
+        float(inputs["variable_costs_pct"]) / 100.0,
+        float(inputs["fixed_costs"]),
+        int(inputs["horizon_months"]),
     )
     months = pd.RangeIndex(start=1, stop=horizon + 1, name="month")
     growth_factors = (1 + growth_rate) ** (months - 1)
@@ -56,12 +67,19 @@ def calculate_pnl(inputs: Dict) -> pd.DataFrame:
     fixed_costs = pd.Series(fixed, index=months, name="fixed_costs")
     operating_profit = gross_profit - fixed_costs
     net_profit = operating_profit.copy()
-    df = pd.DataFrame({
-        "revenue": revenue_series, "cogs": cogs, "gross_profit": gross_profit,
-        "fixed_costs": fixed_costs, "operating_profit": operating_profit, "net_profit": net_profit
-    })
+    df = pd.DataFrame(
+        {
+            "revenue": revenue_series,
+            "cogs": cogs,
+            "gross_profit": gross_profit,
+            "fixed_costs": fixed_costs,
+            "operating_profit": operating_profit,
+            "net_profit": net_profit,
+        }
+    )
     df.index.name = "month"
     return df
+
 
 def calculate_cashflow(inputs: Dict) -> pd.DataFrame:
     _validate_inputs(inputs)
@@ -73,17 +91,24 @@ def calculate_cashflow(inputs: Dict) -> pd.DataFrame:
     payments = pnl["cogs"] + pnl["fixed_costs"]
     net_cash = receipts - payments
     cumulative_cash = net_cash.cumsum()
-    df = pd.DataFrame({
-        "receipts": receipts, "payments": payments,
-        "net_cash": net_cash, "cumulative_cash": cumulative_cash
-    })
+    df = pd.DataFrame(
+        {
+            "receipts": receipts,
+            "payments": payments,
+            "net_cash": net_cash,
+            "cumulative_cash": cumulative_cash,
+        }
+    )
     df.index.name = "month"
     return df
+
 
 def calculate_unit_economics(inputs: Dict) -> Dict:
     _validate_inputs(inputs)
     arpu, churn_pct, cac = (
-        float(inputs["arpu"]), float(inputs["churn_pct"]), float(inputs["cac"])
+        float(inputs["arpu"]),
+        float(inputs["churn_pct"]),
+        float(inputs["cac"]),
     )
     warnings: List[str] = []
 
@@ -99,12 +124,16 @@ def calculate_unit_economics(inputs: Dict) -> Dict:
 
     cashflow = calculate_cashflow(inputs)
     positive_cashflow = cashflow["cumulative_cash"] >= 0
-    bem: Optional[int] = int(positive_cashflow.idxmax()) if positive_cashflow.any() else None
+    bem: Optional[int] = (
+        int(positive_cashflow.idxmax()) if positive_cashflow.any() else None
+    )
 
     if inputs.get("payment_lag_days", 0) > 60:
         warnings.append("HIGH_PAYMENT_LAG")
 
     return {
-        "ltv": ltv, "ltv_cac": ltv_cac,
-        "break_even_month": bem, "warnings": warnings
+        "ltv": ltv,
+        "ltv_cac": ltv_cac,
+        "break_even_month": bem,
+        "warnings": warnings,
     }
