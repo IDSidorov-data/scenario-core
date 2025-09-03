@@ -1,4 +1,18 @@
-# app.py (Финальная, эталонная версия v22 - Production-Ready)
+# app.py
+"""
+Streamlit web application for the "Scenario" Financial Simulator.
+
+This is the main entry point for the user interface. It handles:
+- Page configuration and custom CSS styling.
+- Session state management for UI and calculation results.
+- Internationalization (i18n) by loading language files.
+- UI layout, including a sidebar for inputs and a tabbed main area for results.
+- Input collection and validation using jsonschema.
+- Invoking the core financial calculation engine.
+- Displaying results: key metrics, data tables, and interactive charts.
+- Generating and offering downloadable reports in Excel and JSON formats.
+- Robust error handling for calculation and validation issues.
+"""
 import json
 from copy import deepcopy
 from typing import Dict, Any
@@ -10,24 +24,28 @@ from jsonschema import validate, ValidationError
 import pandas as pd
 import altair as alt
 
+# Excel export specific imports
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Border, Side, Alignment
 
+# Core business logic
 from core.financials import (
     calculate_pnl,
     calculate_cashflow,
     calculate_unit_economics,
 )
 
-# --- Конфигурация страницы и стили ---
+# --- 1. Page Configuration and Styling ---
 st.set_page_config(page_title="Scenario — Финансовый симулятор", layout="wide")
 
+# Inject custom CSS for a polished UI, including custom tab styles.
 st.markdown(
     """
 <style>
     .block-container { padding-top: 1rem !important; }
     [data-testid="stSidebar"] h2 { margin-top: -1.7rem; font-size: 24px !important; color: #262730; }
     [data-testid="stDownloadButton"] { margin-bottom: 10px; }
+    /* Custom radio buttons styled as tabs */
     div[role="radiogroup"] { flex-direction: row; gap: 2px; }
     div[role="radiogroup"] > label > div:first-child { display: none; }
     div[role="radiogroup"] > label {
@@ -45,7 +63,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# NEW: Надежная инициализация всех ключей session_state
+# --- 2. Session State Initialization ---
+# Robustly initialize all required session_state keys to prevent errors on first run.
 for k, v in [
     ("calc_result", None),
     ("allow_send_ai", False),
@@ -56,34 +75,63 @@ for k, v in [
         st.session_state[k] = v
 
 
-# FIXED: Убран UI-вызов из кэшируемой функции
+# --- 3. Localization (i18n) and Helper Functions ---
 @st.cache_data
 def load_translation(lang: str = "ru") -> Dict[str, Any]:
+    """
+    Loads a translation JSON file for the specified language.
+
+    Searches for the language file in several possible locations to ensure
+    it's found regardless of the execution context (e.g., local run vs. deployment).
+
+    Args:
+        lang: The language code (e.g., "ru").
+
+    Returns:
+        A dictionary with translation strings, or an empty dict if not found.
+    """
     fname = f"{lang}.json"
     candidates = []
     try:
+        # Path relative to this file's location
         here = Path(__file__).resolve().parent
         candidates.extend([here / "core" / "locales" / fname, here / "locales" / fname])
     except Exception:
         pass
+    # Path relative to the current working directory
     cwd = Path.cwd()
     candidates.extend([cwd / "core" / "locales" / fname, cwd / "locales" / fname])
+
     for p in candidates:
-        try:
-            if p.exists():
+        if p.exists():
+            try:
                 with p.open("r", encoding="utf-8") as f:
                     return json.load(f)
-        except Exception:
-            pass
+            except Exception:
+                # If one path fails, continue to the next
+                pass
     return {}
 
 
+# Load the translation file and provide a helper function for easy access.
 T = load_translation("ru")
 if not T:
-    st.warning("Файл локализации не найден. Будут использоваться стандартные названия.")
+    st.warning("Localization file not found. Using default labels.")
 
 
 def _(key: str, default: str = "") -> str:
+    """
+    Gets a translation string for a given key using dot notation.
+
+    Example: _("ui.title") will look for T['ui']['title'].
+
+    Args:
+        key: The dot-separated key for the translation string.
+        default: A fallback value if the key is not found.
+
+    Returns:
+        The translated string or the default value.
+    """
     parts = key.split(".")
     cur = T
     for p in parts:
@@ -95,24 +143,38 @@ def _(key: str, default: str = "") -> str:
 
 
 def format_rub(value: Any, decimals: int = 0) -> str:
+    """Formats a numeric value as a Russian Ruble string."""
     try:
         if value is None:
-            return "—"
+            return "—"  # Return em-dash for None values
         v = float(value)
+        # Format with spaces as thousand separators
         fmt = f"{v:,.{decimals}f}".replace(",", " ")
         return f"{fmt} ₽"
-    except Exception:
+    except (ValueError, TypeError):
         return f"{value} ₽"
 
 
 def create_excel_workbook(
     sheets: Dict[str, pd.DataFrame], index_names: Dict[str, str]
 ) -> bytes:
+    """
+    Creates a styled Excel workbook from multiple DataFrames.
+
+    Args:
+        sheets: A dictionary where keys are sheet names and values are DataFrames.
+        index_names: A dictionary mapping sheet names to their desired index column name.
+
+    Returns:
+        The Excel file as a bytes object, ready for download.
+    """
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         for sheet_name, df in sheets.items():
             idx_name = index_names.get(sheet_name, "Index")
             df_to_write = df.copy()
+
+            # Round numeric columns to avoid excessive decimals in Excel
             for col in df_to_write.columns:
                 if pd.api.types.is_numeric_dtype(df_to_write[col]):
                     df_to_write[col] = df_to_write[col].round(2)
@@ -122,6 +184,7 @@ def create_excel_workbook(
             )
             worksheet = writer.sheets[sheet_name]
 
+            # --- Apply styling to the worksheet ---
             header_font = Font(bold=True)
             thin = Side(border_style="thin", color="000000")
             border = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -152,25 +215,29 @@ def create_excel_workbook(
     return output.getvalue()
 
 
-# NEW: Функции для синхронизации чекбоксов
+# --- 4. UI State Synchronization Callbacks ---
 def _sync_ai_consent_local():
+    """Syncs the main AI consent state from the local checkbox in the main area."""
     st.session_state["allow_send_ai"] = st.session_state.get(
         "allow_send_ai_local", False
     )
 
 
 def _sync_ai_consent_main():
+    """Syncs the local AI consent state from the main checkbox in the sidebar."""
     st.session_state["allow_send_ai_local"] = st.session_state.get(
         "allow_send_ai", False
     )
 
 
-# --- Основной UI ---
+# --- 5. Main Application UI ---
 st.title(_("app_title", "Scenario — Финансовый симулятор"))
 
+# --- Sidebar for Inputs ---
 with st.sidebar:
     st.markdown(f"## {_('inputs_header', 'Параметры бизнеса')}")
 
+    # Main consent checkbox, linked to the one in the main area.
     st.checkbox(
         _("ui.ai_consent_checkbox_label", "Разрешаю отправку данных в AI"),
         key="allow_send_ai",
@@ -178,6 +245,7 @@ with st.sidebar:
     )
     st.markdown("---")
 
+    # Input fields for all financial parameters.
     mrr = st.number_input(
         _("mrr_label", "MRR, ₽"), min_value=0.0, value=5000.0, step=100.0, format="%.2f"
     )
@@ -234,6 +302,8 @@ with st.sidebar:
         step=1,
     )
 
+# --- 6. Input Processing and Validation ---
+# Collect all inputs into a dictionary for processing.
 inputs = {
     "mrr": float(mrr),
     "monthly_growth_pct": float(monthly_growth_pct),
@@ -246,6 +316,7 @@ inputs = {
     "horizon_months": int(horizon_months),
 }
 
+# Define a JSON Schema for robust input validation.
 INPUTS_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "ScenarioInputs",
@@ -277,6 +348,19 @@ INPUTS_SCHEMA = {
 
 @st.cache_data(ttl=300)
 def run_calculations(inp: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Runs all financial calculations and returns the results.
+
+    This function is cached to avoid re-computation on every UI interaction.
+    It validates the input against a schema before calling the core logic.
+
+    Args:
+        inp: A dictionary of financial inputs.
+
+    Returns:
+        A dictionary containing the P&L DataFrame, Cash Flow DataFrame,
+        and unit economics metrics.
+    """
     local = deepcopy(inp)
     validate(instance=local, schema=INPUTS_SCHEMA)
     pnl_df = calculate_pnl(local)
@@ -285,6 +369,7 @@ def run_calculations(inp: Dict[str, Any]) -> Dict[str, Any]:
     try:
         unit_metrics = calculate_unit_economics(local)
     except Exception:
+        # Gracefully handle errors in unit economics calculation
         unit_metrics = {
             "ltv": None,
             "ltv_cac": None,
@@ -295,6 +380,7 @@ def run_calculations(inp: Dict[str, Any]) -> Dict[str, Any]:
     return {"pnl": pnl_df, "cashflow": cf_df, "unit_metrics": unit_metrics}
 
 
+# --- 7. Calculation Execution and Error Handling ---
 try:
     with st.spinner(_("ui.calculating_spinner", "Выполняю расчеты...")):
         st.session_state.calc_result = run_calculations(inputs)
@@ -308,6 +394,7 @@ except Exception as e:
         st.exception(e)
     st.session_state.calc_result = None
 
+# --- 8. Results Display ---
 if st.session_state.calc_result:
     pnl_df, cf_df, metrics = (
         st.session_state.calc_result["pnl"],
@@ -315,9 +402,11 @@ if st.session_state.calc_result:
         st.session_state.calc_result["unit_metrics"],
     )
 
+    # Display any warnings from the calculation engine.
     for w_code in metrics.get("warnings", []):
         st.warning(_(f"warnings.{w_code.lower()}", w_code))
 
+    # Main layout with two columns: Metrics on the left, Reports on the right.
     left, right = st.columns([1, 2])
     with left:
         st.header(_("unit_econ_header", "Ключевые метрики"))
@@ -341,6 +430,7 @@ if st.session_state.calc_result:
 
         st.markdown("---")
 
+        # AI Recommendation section with synchronized consent checkbox.
         col1, col2 = st.columns([1, 3])
         with col1:
             st.checkbox(
@@ -372,6 +462,7 @@ if st.session_state.calc_result:
             "table_index_month", "Месяц"
         )
 
+        # Tabbed interface for displaying reports
         tab_options = {
             "pnl": _("pnl_tab", "P&L"),
             "cashflow": _("cashflow_tab", "Денежный поток"),
@@ -391,6 +482,7 @@ if st.session_state.calc_result:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
+        # --- Tab Content ---
         if selected_tab_key == "pnl":
             st.subheader(_("pnl_subheader", "Прибыли и убытки"))
             st.dataframe(

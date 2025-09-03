@@ -2,9 +2,12 @@
 $projectPath = $PSScriptRoot
 $outputFile = Join-Path $projectPath "project_context.txt"
 
+# Обновленный список исключений для папок
 $excludeDirs = @(
-    ".git", ".github", "venv", "__pycache__", ".vscode"
+    ".git", ".github", "venv", "myenv", "__pycache__", ".vscode"
 )
+
+# Обновленный список исключений для файлов
 $excludeFiles = @(
     "*.env*",
     ".streamlit/secrets.toml", # ВАЖНО: исключаем файл с секретами
